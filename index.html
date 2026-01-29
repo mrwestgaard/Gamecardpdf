@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pokemon Sticker Tool</title>
+
+<style>
+/* Inställningar för utskrift */
+@page {
+  size: letter;
+  margin: 0;
+}
+
+body {
+  margin: 0;
+  padding: 20px;
+  background: #f0f2f5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: sans-serif;
+}
+
+/* Själva arket */
+#sheet {
+  position: relative;
+  width: 216mm;
+  height: 279mm;
+  background: white;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+/* Slots / Rutorna */
+.slot {
+  position: absolute;
+  width: 63mm;
+  height: 88mm;
+  overflow: hidden;
+  /* Grå streckade linjer som syns som mall */
+  border: 0.1mm dashed #ccc;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fafafa;
+  transition: background 0.2s;
+}
+
+.slot:hover {
+  background-color: #f0f8ff;
+  border-color: #007bff;
+}
+
+/* Text som syns innan man laddat upp bild */
+.slot:empty::before {
+  content: "Klicka för bild";
+  font-size: 10px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Grid-logik (Marginaler och placering) */
+:root {
+  --mx: 13.5mm; /* Sidomarginal */
+  --my: 7.5mm;  /* Toppmarginal */
+  --gx: 63mm;   /* Slot bredd */
+  --gy: 88mm;   /* Slot höjd */
+}
+
+/* Rad 1 */
+.s1 { left: var(--mx); top: var(--my); }
+.s2 { left: calc(var(--mx) + var(--gx)); top: var(--my); }
+.s3 { left: calc(var(--mx) + var(--gx)*2); top: var(--my); }
+
+/* Rad 2 */
+.s4 { left: var(--mx); top: calc(var(--my) + var(--gy)); }
+.s5 { left: calc(var(--mx) + var(--gx)); top: calc(var(--my) + var(--gy)); }
+.s6 { left: calc(var(--mx) + var(--gx)*2); top: calc(var(--my) + var(--gy)); }
+
+/* Rad 3 */
+.s7 { left: var(--mx); top: calc(var(--my) + var(--gy)*2); }
+.s8 { left: calc(var(--mx) + var(--gx)); top: calc(var(--my) + var(--gy)*2); }
+.s9 { left: calc(var(--mx) + var(--gx)*2); top: calc(var(--my) + var(--gy)*2); }
+
+/* Kontrollpanel */
+#controls {
+  position: fixed;
+  bottom: 20px;
+  background: white;
+  padding: 15px 25px;
+  border-radius: 50px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  display: flex;
+  gap: 10px;
+  z-index: 100;
+}
+
+button {
+  padding: 10px 20px;
+  border: none;
+  background: #007bff;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+button:hover {
+  background: #0056b3;
+}
+
+button.secondary {
+  background: #6c757d;
+}
+
+/* Vid export vill vi dölja borders om man vill ha rena stickers */
+.export-mode .slot {
+  border: none;
+}
+</style>
+</head>
+
+<body>
+
+<div id="sheet">
+  <div class="slot s1"></div>
+  <div class="slot s2"></div>
+  <div class="slot s3"></div>
+  <div class="slot s4"></div>
+  <div class="slot s5"></div>
+  <div class="slot s6"></div>
+  <div class="slot s7"></div>
+  <div class="slot s8"></div>
+  <div class="slot s9"></div>
+</div>
+
+<div id="controls">
+  <button onclick="exportPDF()">Ladda ner PDF</button>
+  <button class="secondary" onclick="location.reload()">Rensa allt</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+// Hantera klick på rutorna
+document.querySelectorAll(".slot").forEach(slot => {
+  slot.addEventListener("click", () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const img = document.createElement("img");
+      img.src = URL.createObjectURL(file);
+      slot.innerHTML = "";
+      slot.appendChild(img);
+    };
+    input.click();
+  });
+});
+
+// PDF Export
+async function exportPDF() {
+  const sheet = document.getElementById("sheet");
+  const controls = document.getElementById("controls");
+
+  // Dölj kontroller under exporten
+  controls.style.display = "none";
+
+  try {
+    const canvas = await html2canvas(sheet, {
+      scale: 3, // Hög kvalitet
+      useCORS: true,
+      logging: false
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    const { jsPDF } = window.jspdf;
+
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "letter"
+    });
+
+    pdf.addImage(imgData, "PNG", 0, 0, 216, 279);
+    pdf.save("pokemon-stickers.pdf");
+
+  } catch (err) {
+    console.error("Export misslyckades:", err);
+    alert("Något gick fel vid exporten.");
+  } finally {
+    // Visa kontroller igen
+    controls.style.display = "flex";
+  }
+}
+</script>
+
+</body>
+</html>
